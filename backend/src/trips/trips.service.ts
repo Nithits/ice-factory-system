@@ -6,10 +6,14 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTripDto } from './dto/create-trip.dto';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class TripsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly trackingGateway: TrackingGateway,
+  ) {}
 
   async create(dto: CreateTripDto) {
     const vehicle = await this.prisma.vehicle.findUnique({
@@ -44,7 +48,7 @@ export class TripsService {
       }
     }
 
-    return this.prisma.trip.create({
+    const trip = await this.prisma.trip.create({
       data: {
         vehicleId: dto.vehicleId,
         driverId: dto.driverId,
@@ -79,6 +83,10 @@ export class TripsService {
         },
       },
     });
+
+    this.trackingGateway.emitTripUpdated(trip);
+
+    return trip;
   }
 
   findAll() {
@@ -165,7 +173,7 @@ export class TripsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updatedTrip = await this.prisma.$transaction(async (tx) => {
       const updatedTrip = await tx.trip.update({
         where: { id },
 
@@ -206,6 +214,10 @@ export class TripsService {
 
       return updatedTrip;
     });
+
+    this.trackingGateway.emitTripUpdated(updatedTrip);
+
+    return updatedTrip;
   }
 
   async completeTrip(id: number) {
@@ -227,7 +239,7 @@ export class TripsService {
     );
   }
 
-  return this.prisma.$transaction(async (tx) => {
+  const updatedTrip = await this.prisma.$transaction(async (tx) => {
     const updatedTrip = await tx.trip.update({
       where: { id },
 
@@ -278,5 +290,9 @@ export class TripsService {
 
     return updatedTrip;
   });
+
+  this.trackingGateway.emitTripUpdated(updatedTrip);
+
+  return updatedTrip;
 }
 }

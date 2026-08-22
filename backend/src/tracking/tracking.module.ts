@@ -12,5 +12,6 @@ import { AuthModule } from '../auth/auth.module';
     TrackingService,
     TrackingGateway,
   ],
+  exports: [TrackingGateway],
 })
 export class TrackingModule {}

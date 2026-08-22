@@ -6,10 +6,14 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeliveryDto } from './dto/create-delivery.dto';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class DeliveriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly trackingGateway: TrackingGateway,
+  ) {}
 
   async create(dto: CreateDeliveryDto) {
     const trip = await this.prisma.trip.findUnique({
@@ -53,7 +57,7 @@ export class DeliveriesService {
       deliveryTotal += item.quantity * item.unitPrice;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const delivery = await this.prisma.$transaction(async (tx) => {
       const delivery = await tx.delivery.create({
         data: {
           tripId: dto.tripId,
@@ -118,6 +122,10 @@ export class DeliveriesService {
 
       return delivery;
     });
+
+    this.trackingGateway.emitDeliveryCreated(delivery);
+
+    return delivery;
   }
 
   findAll() {

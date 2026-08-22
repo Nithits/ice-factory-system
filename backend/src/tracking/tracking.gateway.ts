@@ -28,4 +28,12 @@ export class TrackingGateway
   emitVehicleLocation(data: unknown) {
     this.server.emit('vehicle-location', data);
   }
+
+  emitTripUpdated(data: unknown) {
+    this.server.emit('trip-updated', data);
+  }
+
+  emitDeliveryCreated(data: unknown) {
+    this.server.emit('delivery-created', data);
+  }
 }

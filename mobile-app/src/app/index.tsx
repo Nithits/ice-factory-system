@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -8,12 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
 
-import { api } from '../api/api';
-import { saveToken } from '../storage/auth';
+import { useAuth } from '../context/auth-context';
 
 export default function LoginScreen() {
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,15 +28,7 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-
-      const response = await api.post('/auth/login', {
-        username,
-        password,
-      });
-
-      await saveToken(response.data.accessToken);
-
-      router.replace('/home');
+      await login(username, password);
     } catch {
       Alert.alert(
         'เข้าสู่ระบบไม่สำเร็จ',
@@ -47,7 +41,10 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.card}
+      >
         <Text style={styles.title}>Ice Delivery</Text>
         <Text style={styles.subtitle}>ระบบพนักงานส่งน้ำแข็ง</Text>
 
@@ -72,11 +69,13 @@ export default function LoginScreen() {
           onPress={handleLogin}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>
-            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>เข้าสู่ระบบ</Text>
+          )}
         </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
