@@ -7,7 +7,11 @@ import { useAuth } from '@/lib/auth-context';
 
 const LINKS = [
   { href: '/', label: 'ภาพรวม' },
+  { href: '/tracking', label: 'ติดตามรถ' },
   { href: '/trips', label: 'เที่ยวรถ' },
+  { href: '/customers', label: 'ร้านค้า' },
+  { href: '/warehouse', label: 'คลังสินค้า' },
+  { href: '/employees', label: 'พนักงาน' },
   { href: '/reports/daily', label: 'สรุปรายวัน' },
 ];
 
@@ -18,11 +22,11 @@ export function Nav() {
 
   return (
     <header className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-8">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-2 px-6 py-4">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
           <span className="text-lg font-bold">🧊 Ice Delivery</span>
 
-          <nav className="flex gap-1">
+          <nav className="flex flex-wrap gap-1">
             {LINKS.map((link) => (
               <Link
                 key={link.href}

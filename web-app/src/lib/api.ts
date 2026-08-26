@@ -1,11 +1,20 @@
 import axios from 'axios';
 import type {
   AuthUser,
+  Customer,
   Delivery,
   IceProduct,
+  IceTank,
+  ProblemReport,
+  ProblemStatus,
+  Shift,
+  TankStatus,
   Trip,
+  UserRole,
   Vehicle,
   VehicleWithLocation,
+  Village,
+  Zone,
 } from '@/types';
 
 export const API_URL =
@@ -67,6 +76,14 @@ api.interceptors.response.use(
   },
 );
 
+export function getErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const message = err.response?.data?.message;
+    if (typeof message === 'string') return message;
+  }
+  return fallback;
+}
+
 export interface LoginResult {
   accessToken: string;
   user: AuthUser;
@@ -101,5 +118,83 @@ export const trackingApi = {
   latestVehicles: () =>
     api
       .get<VehicleWithLocation[]>('/tracking/vehicles')
+      .then((res) => res.data),
+};
+
+export interface CreateUserPayload {
+  name: string;
+  username: string;
+  password: string;
+  phone?: string;
+  role?: UserRole;
+}
+
+export const usersApi = {
+  list: () => api.get<AuthUser[]>('/users').then((res) => res.data),
+  create: (payload: CreateUserPayload) =>
+    api.post<AuthUser>('/users', payload).then((res) => res.data),
+};
+
+export const zonesApi = {
+  list: () => api.get<Zone[]>('/zones').then((res) => res.data),
+  create: (name: string) =>
+    api.post<Zone>('/zones', { name }).then((res) => res.data),
+  remove: (id: number) => api.delete(`/zones/${id}`).then((res) => res.data),
+};
+
+export const villagesApi = {
+  list: () => api.get<Village[]>('/villages').then((res) => res.data),
+  create: (payload: { zoneId: number; name: string }) =>
+    api.post<Village>('/villages', payload).then((res) => res.data),
+  remove: (id: number) =>
+    api.delete(`/villages/${id}`).then((res) => res.data),
+};
+
+export interface CreateCustomerPayload {
+  villageId: number;
+  name: string;
+  phone?: string;
+  latitude?: number;
+  longitude?: number;
+  note?: string;
+}
+
+export const customersApi = {
+  list: () => api.get<Customer[]>('/customers').then((res) => res.data),
+  get: (id: number) =>
+    api.get<Customer>(`/customers/${id}`).then((res) => res.data),
+  create: (payload: CreateCustomerPayload) =>
+    api.post<Customer>('/customers', payload).then((res) => res.data),
+  remove: (id: number) =>
+    api.delete(`/customers/${id}`).then((res) => res.data),
+};
+
+export const iceTanksApi = {
+  create: (payload: {
+    customerId: number;
+    size: string;
+    quantity?: number;
+    status?: TankStatus;
+  }) => api.post<IceTank>('/ice-tanks', payload).then((res) => res.data),
+  update: (id: number, status: TankStatus) =>
+    api
+      .patch<IceTank>(`/ice-tanks/${id}`, { status })
+      .then((res) => res.data),
+  remove: (id: number) =>
+    api.delete(`/ice-tanks/${id}`).then((res) => res.data),
+};
+
+export const shiftsApi = {
+  findActive: () => api.get<Shift[]>('/shifts/active').then((res) => res.data),
+};
+
+export const problemReportsApi = {
+  list: (status?: ProblemStatus) =>
+    api
+      .get<ProblemReport[]>('/problem-reports', { params: { status } })
+      .then((res) => res.data),
+  resolve: (id: number) =>
+    api
+      .patch<ProblemReport>(`/problem-reports/${id}/resolve`)
       .then((res) => res.data),
 };
