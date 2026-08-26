@@ -11,38 +11,22 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
-import { customersApi, deliveriesApi } from '../api/endpoints';
-import type { Customer } from '../types';
+import { tripStopsApi } from '../api/endpoints';
+import type { TripStop } from '../types';
 
 interface VillageGroup {
   villageId: number;
   villageName: string;
   zoneName: string;
-  customers: Customer[];
+  stops: TripStop[];
 }
 
 export default function TodoListContent({ tripId }: { tripId: number }) {
-  const [customers, setCustomers] = useState<Customer[] | null>(null);
-  const [doneCustomerIds, setDoneCustomerIds] = useState<Set<number>>(
-    new Set(),
-  );
+  const [stops, setStops] = useState<TripStop[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [customerList, deliveries] = await Promise.all([
-      customersApi.list(),
-      deliveriesApi.list(),
-    ]);
-
-    setCustomers(customerList);
-
-    const done = new Set<number>();
-    for (const delivery of deliveries) {
-      if (delivery.tripId === tripId && delivery.customerId) {
-        done.add(delivery.customerId);
-      }
-    }
-    setDoneCustomerIds(done);
+    setStops(await tripStopsApi.listByTrip(tripId));
   }, [tripId]);
 
   useFocusEffect(
@@ -58,21 +42,22 @@ export default function TodoListContent({ tripId }: { tripId: number }) {
   };
 
   const groups = useMemo<VillageGroup[]>(() => {
-    if (!customers) return [];
+    if (!stops) return [];
 
     const byVillage = new Map<number, VillageGroup>();
 
-    for (const customer of customers) {
-      const existing = byVillage.get(customer.villageId);
+    for (const stop of stops) {
+      const villageId = stop.customer.villageId;
+      const existing = byVillage.get(villageId);
 
       if (existing) {
-        existing.customers.push(customer);
+        existing.stops.push(stop);
       } else {
-        byVillage.set(customer.villageId, {
-          villageId: customer.villageId,
-          villageName: customer.village.name,
-          zoneName: customer.village.zone.name,
-          customers: [customer],
+        byVillage.set(villageId, {
+          villageId,
+          villageName: stop.customer.village.name,
+          zoneName: stop.customer.village.zone.name,
+          stops: [stop],
         });
       }
     }
@@ -80,27 +65,28 @@ export default function TodoListContent({ tripId }: { tripId: number }) {
     return Array.from(byVillage.values()).sort((a, b) =>
       a.villageName.localeCompare(b.villageName, 'th'),
     );
-  }, [customers]);
+  }, [stops]);
 
-  const openInMaps = (customer: Customer) => {
-    if (customer.latitude == null || customer.longitude == null) return;
+  const openInMaps = (stop: TripStop) => {
+    const { latitude, longitude } = stop.customer;
+    if (latitude == null || longitude == null) return;
     Linking.openURL(
-      `https://www.google.com/maps/search/?api=1&query=${customer.latitude},${customer.longitude}`,
+      `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
     );
   };
 
-  const goDeliver = (customer: Customer) => {
+  const goDeliver = (stop: TripStop) => {
     router.push({
       pathname: `/new-delivery/${tripId}`,
       params: {
-        customerId: String(customer.id),
-        customerName: customer.name,
-        village: customer.village.name,
+        customerId: String(stop.customer.id),
+        customerName: stop.customer.name,
+        village: stop.customer.village.name,
       },
     });
   };
 
-  if (!customers) {
+  if (!stops) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
@@ -117,7 +103,12 @@ export default function TodoListContent({ tripId }: { tripId: number }) {
     >
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => router.push('/new-customer')}
+        onPress={() =>
+          router.push({
+            pathname: '/new-customer',
+            params: { tripId: String(tripId) },
+          })
+        }
       >
         <Text style={styles.addButtonText}>+ เพิ่มร้านใหม่ระหว่างทาง</Text>
       </TouchableOpacity>
@@ -125,7 +116,8 @@ export default function TodoListContent({ tripId }: { tripId: number }) {
       {groups.length === 0 && (
         <View style={styles.card}>
           <Text style={styles.emptySub}>
-            ยังไม่มีร้านค้าในระบบ ให้เพิ่มร้านใหม่ด้านบน หรือรอแอดมินตั้งค่าโซน/หมู่บ้านก่อน
+            ยังไม่มีรายการที่ต้องส่งสำหรับเที่ยวนี้ รอแอดมินมอบหมายงาน
+            หรือเพิ่มร้านใหม่ระหว่างทางได้ด้านบน
           </Text>
         </View>
       )}
@@ -137,13 +129,16 @@ export default function TodoListContent({ tripId }: { tripId: number }) {
             <Text style={styles.zoneName}>({group.zoneName})</Text>
           </Text>
 
-          {group.customers.map((customer) => {
-            const isDone = doneCustomerIds.has(customer.id);
+          {group.stops.map((stop) => {
+            const isDone = stop.status === 'DONE';
 
             return (
-              <View key={customer.id} style={styles.customerRow}>
+              <View key={stop.id} style={styles.customerRow}>
                 <View style={styles.customerInfo}>
-                  <Text style={styles.customerName}>{customer.name}</Text>
+                  <Text style={styles.customerName}>{stop.customer.name}</Text>
+                  {stop.note && (
+                    <Text style={styles.customerNote}>{stop.note}</Text>
+                  )}
                   <Text
                     style={[
                       styles.customerBadge,
@@ -155,21 +150,23 @@ export default function TodoListContent({ tripId }: { tripId: number }) {
                 </View>
 
                 <View style={styles.customerActions}>
-                  {customer.latitude != null && (
+                  {stop.customer.latitude != null && (
                     <TouchableOpacity
                       style={styles.navButton}
-                      onPress={() => openInMaps(customer)}
+                      onPress={() => openInMaps(stop)}
                     >
                       <Text style={styles.navButtonText}>นำทาง</Text>
                     </TouchableOpacity>
                   )}
 
-                  <TouchableOpacity
-                    style={styles.deliverButton}
-                    onPress={() => goDeliver(customer)}
-                  >
-                    <Text style={styles.deliverButtonText}>ส่งของ</Text>
-                  </TouchableOpacity>
+                  {!isDone && (
+                    <TouchableOpacity
+                      style={styles.deliverButton}
+                      onPress={() => goDeliver(stop)}
+                    >
+                      <Text style={styles.deliverButtonText}>ส่งของ</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );
@@ -244,6 +241,11 @@ const styles = StyleSheet.create({
   customerName: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  customerNote: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
   },
   customerBadge: {
     marginTop: 2,

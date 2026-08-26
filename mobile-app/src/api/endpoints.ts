@@ -8,6 +8,7 @@ import type {
   ProblemReport,
   Shift,
   Trip,
+  TripStop,
   UserRole,
   Vehicle,
   VehicleWithLocation,
@@ -175,4 +176,21 @@ export const problemReportsApi = {
     api
       .post<ProblemReport>('/problem-reports', payload)
       .then((res) => res.data),
+};
+
+export interface CreateTripStopPayload {
+  tripId: number;
+  customerId: number;
+  note?: string;
+}
+
+export const tripStopsApi = {
+  listByTrip: (tripId: number) =>
+    api
+      .get<TripStop[]>('/trip-stops', { params: { tripId } })
+      .then((res) => res.data),
+  create: (payload: CreateTripStopPayload) =>
+    api.post<TripStop>('/trip-stops', payload).then((res) => res.data),
+  remove: (id: number) =>
+    api.delete(`/trip-stops/${id}`).then((res) => res.data),
 };

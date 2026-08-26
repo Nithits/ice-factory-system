@@ -6,6 +6,7 @@ export type TripCrewRole = 'DRIVER' | 'HELPER';
 export type ShiftStatus = 'ACTIVE' | 'ON_BREAK' | 'ENDED';
 export type ProblemCategory = 'VEHICLE' | 'CUSTOMER' | 'STOCK' | 'OTHER';
 export type ProblemStatus = 'OPEN' | 'RESOLVED';
+export type TripStopStatus = 'PENDING' | 'DONE';
 
 export interface AuthUser {
   id: number;
@@ -139,6 +140,17 @@ export interface ProblemReport {
   longitude: number | null;
   createdAt: string;
   user: TripDriver;
+}
+
+export interface TripStop {
+  id: number;
+  tripId: number;
+  customerId: number;
+  note: string | null;
+  status: TripStopStatus;
+  createdById: number;
+  createdAt: string;
+  customer: Customer;
 }
 
 export interface GpsLog {

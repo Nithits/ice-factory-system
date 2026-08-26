@@ -10,12 +10,13 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
-import { customersApi, villagesApi } from '../api/endpoints';
+import { customersApi, tripStopsApi, villagesApi } from '../api/endpoints';
 import type { Village } from '../types';
 
 export default function NewCustomerScreen() {
+  const { tripId } = useLocalSearchParams<{ tripId?: string }>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [villages, setVillages] = useState<Village[]>([]);
@@ -77,7 +78,7 @@ export default function NewCustomerScreen() {
 
     try {
       setSubmitting(true);
-      await customersApi.create({
+      const customer = await customersApi.create({
         villageId,
         name: name.trim(),
         phone: phone.trim() || undefined,
@@ -85,6 +86,13 @@ export default function NewCustomerScreen() {
         latitude: coords?.latitude,
         longitude: coords?.longitude,
       });
+
+      if (tripId) {
+        await tripStopsApi.create({
+          tripId: Number(tripId),
+          customerId: customer.id,
+        });
+      }
 
       Alert.alert('สำเร็จ', 'เพิ่มร้านค้าใหม่เรียบร้อยแล้ว');
       router.back();
