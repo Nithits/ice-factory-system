@@ -1,7 +1,9 @@
 import {
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsInt,
+  IsOptional,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -22,6 +24,12 @@ export class CreateTripDto {
 
   @IsInt()
   driverId: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({ each: true })
+  helperIds?: number[];
 
   @IsArray()
   @ArrayMinSize(1)

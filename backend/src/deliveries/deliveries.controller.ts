@@ -15,9 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('deliveries')
 export class DeliveriesController {
-  constructor(
-    private readonly deliveriesService: DeliveriesService,
-  ) {}
+  constructor(private readonly deliveriesService: DeliveriesService) {}
 
   @Post()
   create(@Body() dto: CreateDeliveryDto) {

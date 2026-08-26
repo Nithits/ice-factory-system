@@ -35,6 +35,16 @@ export class DeliveriesService {
       );
     }
 
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: dto.customerId },
+      });
+
+      if (!customer) {
+        throw new NotFoundException(`ไม่พบร้านค้า ID ${dto.customerId}`);
+      }
+    }
+
     let deliveryTotal = 0;
 
     for (const item of dto.items) {
@@ -61,6 +71,7 @@ export class DeliveriesService {
       const delivery = await tx.delivery.create({
         data: {
           tripId: dto.tripId,
+          customerId: dto.customerId,
           customerName: dto.customerName,
           village: dto.village,
           latitude: dto.latitude,
@@ -144,6 +155,8 @@ export class DeliveriesService {
           },
         },
 
+        customer: true,
+
         items: {
           include: {
             iceProduct: true,
@@ -176,6 +189,8 @@ export class DeliveriesService {
             },
           },
         },
+
+        customer: true,
 
         items: {
           include: {

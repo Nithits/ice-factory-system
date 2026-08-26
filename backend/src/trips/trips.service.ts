@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,6 +8,38 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
+
+const tripInclude = {
+  vehicle: true,
+
+  driver: {
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      role: true,
+    },
+  },
+
+  crew: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          role: true,
+        },
+      },
+    },
+  },
+
+  items: {
+    include: {
+      iceProduct: true,
+    },
+  },
+} as const;
 
 @Injectable()
 export class TripsService {
@@ -36,6 +69,24 @@ export class TripsService {
       throw new BadRequestException('ผู้ใช้นี้ไม่ใช่คนขับรถ');
     }
 
+    const helperIds = (dto.helperIds ?? []).filter(
+      (helperId) => helperId !== dto.driverId,
+    );
+
+    for (const helperId of helperIds) {
+      const helper = await this.prisma.user.findUnique({
+        where: { id: helperId },
+      });
+
+      if (!helper) {
+        throw new NotFoundException(`ไม่พบผู้ช่วยคนขับ ID ${helperId}`);
+      }
+
+      if (helper.role !== 'DRIVER') {
+        throw new BadRequestException('ผู้ช่วยคนขับต้องเป็นบัญชีพนักงานขับรถ');
+      }
+    }
+
     for (const item of dto.items) {
       const product = await this.prisma.iceProduct.findUnique({
         where: { id: item.iceProductId },
@@ -54,6 +105,16 @@ export class TripsService {
         driverId: dto.driverId,
         status: 'LOADING',
 
+        crew: {
+          create: [
+            { userId: dto.driverId, roleOnTrip: 'DRIVER' },
+            ...helperIds.map((userId) => ({
+              userId,
+              roleOnTrip: 'HELPER' as const,
+            })),
+          ],
+        },
+
         items: {
           create: dto.items.map((item) => ({
             iceProductId: item.iceProductId,
@@ -64,24 +125,7 @@ export class TripsService {
         },
       },
 
-      include: {
-        vehicle: true,
-
-        driver: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            role: true,
-          },
-        },
-
-        items: {
-          include: {
-            iceProduct: true,
-          },
-        },
-      },
+      include: tripInclude,
     });
 
     this.trackingGateway.emitTripUpdated(trip);
@@ -91,24 +135,7 @@ export class TripsService {
 
   findAll() {
     return this.prisma.trip.findMany({
-      include: {
-        vehicle: true,
-
-        driver: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            role: true,
-          },
-        },
-
-        items: {
-          include: {
-            iceProduct: true,
-          },
-        },
-      },
+      include: tripInclude,
 
       orderBy: {
         id: 'desc',
@@ -119,25 +146,7 @@ export class TripsService {
   async findOne(id: number) {
     const trip = await this.prisma.trip.findUnique({
       where: { id },
-
-      include: {
-        vehicle: true,
-
-        driver: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            role: true,
-          },
-        },
-
-        items: {
-          include: {
-            iceProduct: true,
-          },
-        },
-      },
+      include: tripInclude,
     });
 
     if (!trip) {
@@ -162,9 +171,7 @@ export class TripsService {
     }
 
     if (trip.status !== 'LOADING') {
-      throw new BadRequestException(
-        'Trip นี้ไม่อยู่ในสถานะเตรียมโหลด',
-      );
+      throw new BadRequestException('Trip นี้ไม่อยู่ในสถานะเตรียมโหลด');
     }
 
     if (trip.items.length === 0) {
@@ -182,21 +189,69 @@ export class TripsService {
           startTime: new Date(),
         },
 
+        include: tripInclude,
+      });
+
+      await tx.vehicle.update({
+        where: {
+          id: trip.vehicleId,
+        },
+
+        data: {
+          status: 'ACTIVE',
+        },
+      });
+
+      return updatedTrip;
+    });
+
+    this.trackingGateway.emitTripUpdated(updatedTrip);
+
+    return updatedTrip;
+  }
+
+  async completeTrip(id: number, requestingUserId: number) {
+    const trip = await this.prisma.trip.findUnique({
+      where: { id },
+      include: {
+        items: true,
+        vehicle: true,
+      },
+    });
+
+    if (!trip) {
+      throw new NotFoundException(`ไม่พบ Trip ID ${id}`);
+    }
+
+    if (trip.driverId !== requestingUserId) {
+      throw new ForbiddenException(
+        'เฉพาะคนขับหลักของเที่ยวนี้เท่านั้นที่ปิดเที่ยว/นำรถกลับโรงงานได้',
+      );
+    }
+
+    if (trip.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('Trip นี้ไม่ได้อยู่ในสถานะกำลังออกส่ง');
+    }
+
+    const updatedTrip = await this.prisma.$transaction(async (tx) => {
+      const updatedTrip = await tx.trip.update({
+        where: { id },
+
+        data: {
+          status: 'COMPLETED',
+          endTime: new Date(),
+        },
+
         include: {
-          vehicle: true,
+          ...tripInclude,
 
-          driver: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              role: true,
-            },
-          },
-
-          items: {
+          deliveries: {
             include: {
-              iceProduct: true,
+              items: {
+                include: {
+                  iceProduct: true,
+                },
+              },
             },
           },
         },
@@ -219,80 +274,4 @@ export class TripsService {
 
     return updatedTrip;
   }
-
-  async completeTrip(id: number) {
-  const trip = await this.prisma.trip.findUnique({
-    where: { id },
-    include: {
-      items: true,
-      vehicle: true,
-    },
-  });
-
-  if (!trip) {
-    throw new NotFoundException(`ไม่พบ Trip ID ${id}`);
-  }
-
-  if (trip.status !== 'IN_PROGRESS') {
-    throw new BadRequestException(
-      'Trip นี้ไม่ได้อยู่ในสถานะกำลังออกส่ง',
-    );
-  }
-
-  const updatedTrip = await this.prisma.$transaction(async (tx) => {
-    const updatedTrip = await tx.trip.update({
-      where: { id },
-
-      data: {
-        status: 'COMPLETED',
-        endTime: new Date(),
-      },
-
-      include: {
-        vehicle: true,
-
-        driver: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            role: true,
-          },
-        },
-
-        items: {
-          include: {
-            iceProduct: true,
-          },
-        },
-
-        deliveries: {
-          include: {
-            items: {
-              include: {
-                iceProduct: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    await tx.vehicle.update({
-      where: {
-        id: trip.vehicleId,
-      },
-
-      data: {
-        status: 'ACTIVE',
-      },
-    });
-
-    return updatedTrip;
-  });
-
-  this.trackingGateway.emitTripUpdated(updatedTrip);
-
-  return updatedTrip;
-}
 }
