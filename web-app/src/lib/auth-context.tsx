@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { authApi, clearToken, getToken, saveToken } from './api';
+import { authApi, clearAuth, getToken, saveToken } from './api';
 import type { AuthUser } from '@/types';
 
 const USER_KEY = 'authUser';
@@ -48,8 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    clearToken();
-    window.localStorage.removeItem(USER_KEY);
+    clearAuth();
     setUser(null);
   };
 
