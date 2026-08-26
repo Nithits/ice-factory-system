@@ -17,12 +17,19 @@ import type { Trip } from '../../types';
 import { formatCurrency } from '../../utils/format';
 
 export default function NewDeliveryScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, customerId, customerName: prefilledName, village: prefilledVillage } =
+    useLocalSearchParams<{
+      tripId: string;
+      customerId?: string;
+      customerName?: string;
+      village?: string;
+    }>();
   const [trip, setTrip] = useState<Trip | null>(null);
-  const [customerName, setCustomerName] = useState('');
-  const [village, setVillage] = useState('');
+  const [customerName, setCustomerName] = useState(prefilledName ?? '');
+  const [village, setVillage] = useState(prefilledVillage ?? '');
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const isRegisteredCustomer = Boolean(customerId);
 
   const load = useCallback(async () => {
     const data = await tripsApi.get(Number(tripId));
@@ -97,6 +104,7 @@ export default function NewDeliveryScreen() {
 
       await deliveriesApi.create({
         tripId: trip.id,
+        customerId: customerId ? Number(customerId) : undefined,
         customerName: customerName.trim(),
         village: village.trim() || undefined,
         ...coords,
@@ -122,21 +130,32 @@ export default function NewDeliveryScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.label}>ชื่อลูกค้า</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="ชื่อลูกค้า / ร้านค้า"
-        value={customerName}
-        onChangeText={setCustomerName}
-      />
+      {isRegisteredCustomer ? (
+        <View style={styles.customerBanner}>
+          <Text style={styles.customerBannerName}>{customerName}</Text>
+          {village ? (
+            <Text style={styles.customerBannerVillage}>{village}</Text>
+          ) : null}
+        </View>
+      ) : (
+        <>
+          <Text style={styles.label}>ชื่อลูกค้า</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="ชื่อลูกค้า / ร้านค้า"
+            value={customerName}
+            onChangeText={setCustomerName}
+          />
 
-      <Text style={styles.label}>หมู่บ้าน (ไม่บังคับ)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="หมู่บ้าน"
-        value={village}
-        onChangeText={setVillage}
-      />
+          <Text style={styles.label}>หมู่บ้าน (ไม่บังคับ)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="หมู่บ้าน"
+            value={village}
+            onChangeText={setVillage}
+          />
+        </>
+      )}
 
       <Text style={styles.sectionTitle}>รายการน้ำแข็ง</Text>
 
@@ -203,6 +222,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 6,
+  },
+  customerBanner: {
+    backgroundColor: '#eef6ff',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  customerBannerName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  customerBannerVillage: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
   },
   input: {
     borderWidth: 1,

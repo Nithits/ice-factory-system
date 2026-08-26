@@ -74,6 +74,27 @@ function RootNavigator() {
           title: 'บันทึกการส่งของ',
         }}
       />
+
+      <Stack.Screen
+        name="todo-list/[tripId]"
+        options={{
+          title: 'รายการที่ต้องส่งวันนี้',
+        }}
+      />
+
+      <Stack.Screen
+        name="new-customer"
+        options={{
+          title: 'เพิ่มร้านค้าใหม่',
+        }}
+      />
+
+      <Stack.Screen
+        name="report-problem/[tripId]"
+        options={{
+          title: 'แจ้งปัญหา',
+        }}
+      />
     </Stack>
   );
 }

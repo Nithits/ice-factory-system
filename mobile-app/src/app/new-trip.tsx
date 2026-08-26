@@ -22,6 +22,7 @@ export default function NewTripScreen() {
   const [products, setProducts] = useState<IceProduct[]>([]);
   const [vehicleId, setVehicleId] = useState<number | null>(null);
   const [driverId, setDriverId] = useState<number | null>(null);
+  const [helperId, setHelperId] = useState<number | null>(null);
   const [quantities, setQuantities] = useState<Record<number, string>>({});
 
   useEffect(() => {
@@ -72,7 +73,12 @@ export default function NewTripScreen() {
 
     try {
       setSubmitting(true);
-      const trip = await tripsApi.create({ vehicleId, driverId, items });
+      const trip = await tripsApi.create({
+        vehicleId,
+        driverId,
+        helperIds: helperId ? [helperId] : undefined,
+        items,
+      });
       Alert.alert('สำเร็จ', 'สร้างเที่ยวและเช็คยอดเรียบร้อยแล้ว');
       router.replace(`/trip/${trip.id}`);
     } catch (error: any) {
@@ -116,7 +122,10 @@ export default function NewTripScreen() {
           <TouchableOpacity
             key={driver.id}
             style={[styles.chip, driverId === driver.id && styles.chipSelected]}
-            onPress={() => setDriverId(driver.id)}
+            onPress={() => {
+              setDriverId(driver.id);
+              if (helperId === driver.id) setHelperId(null);
+            }}
           >
             <Text
               style={[
@@ -128,6 +137,45 @@ export default function NewTripScreen() {
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      <Text style={styles.sectionTitle}>ผู้ช่วยคนขับ (ไม่บังคับ)</Text>
+      <View style={styles.chipRow}>
+        <TouchableOpacity
+          style={[styles.chip, helperId === null && styles.chipSelected]}
+          onPress={() => setHelperId(null)}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              helperId === null && styles.chipTextSelected,
+            ]}
+          >
+            ไม่มีผู้ช่วย
+          </Text>
+        </TouchableOpacity>
+
+        {drivers
+          .filter((driver) => driver.id !== driverId)
+          .map((driver) => (
+            <TouchableOpacity
+              key={driver.id}
+              style={[
+                styles.chip,
+                helperId === driver.id && styles.chipSelected,
+              ]}
+              onPress={() => setHelperId(driver.id)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  helperId === driver.id && styles.chipTextSelected,
+                ]}
+              >
+                {driver.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
       </View>
 
       <Text style={styles.sectionTitle}>เช็คยอดน้ำแข็งที่โหลดขึ้นรถ</Text>

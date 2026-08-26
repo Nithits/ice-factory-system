@@ -11,16 +11,23 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
-import { deliveriesApi, tripsApi } from '../api/endpoints';
+import { deliveriesApi, shiftsApi, tripsApi } from '../api/endpoints';
 import { useAuth } from '../context/auth-context';
 import { useTripTracking } from '../hooks/use-trip-tracking';
-import type { Delivery, Trip } from '../types';
+import type { Delivery, Shift, Trip } from '../types';
 import { TRIP_STATUS_LABEL, formatCurrency } from '../utils/format';
+
+const SHIFT_STATUS_LABEL: Record<Shift['status'], string> = {
+  ACTIVE: 'กำลังทำงาน',
+  ON_BREAK: 'กำลังพัก',
+  ENDED: 'จบกะแล้ว',
+};
 
 export default function DriverHome() {
   const { user, logout } = useAuth();
   const [trip, setTrip] = useState<Trip | null | undefined>(undefined);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [myShift, setMyShift] = useState<Shift | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -31,19 +38,28 @@ export default function DriverHome() {
     const activeTrip =
       trips.find(
         (t) =>
-          t.driverId === user.id &&
+          (t.driverId === user.id ||
+            t.crew.some((member) => member.userId === user.id)) &&
           (t.status === 'LOADING' || t.status === 'IN_PROGRESS'),
       ) ?? null;
 
     setTrip(activeTrip);
 
     if (activeTrip) {
-      const allDeliveries = await deliveriesApi.list();
-      setDeliveries(
-        allDeliveries.filter((d) => d.tripId === activeTrip.id),
+      const [allDeliveries, shifts] = await Promise.all([
+        deliveriesApi.list(),
+        shiftsApi.listByTrip(activeTrip.id),
+      ]);
+
+      setDeliveries(allDeliveries.filter((d) => d.tripId === activeTrip.id));
+      setMyShift(
+        shifts.find(
+          (s) => s.userId === user.id && s.status !== 'ENDED',
+        ) ?? null,
       );
     } else {
       setDeliveries([]);
+      setMyShift(null);
     }
   }, [user]);
 
@@ -54,7 +70,7 @@ export default function DriverHome() {
   );
 
   useTripTracking({
-    enabled: trip?.status === 'IN_PROGRESS',
+    enabled: myShift?.status === 'ACTIVE',
     vehicleId: trip?.vehicleId ?? 0,
     tripId: trip?.id ?? 0,
   });
@@ -65,16 +81,17 @@ export default function DriverHome() {
     setRefreshing(false);
   };
 
-  const handleStart = async () => {
-    if (!trip) return;
-
+  const runAction = async (
+    action: () => Promise<unknown>,
+    failTitle: string,
+  ) => {
     try {
       setBusy(true);
-      const updated = await tripsApi.start(trip.id);
-      setTrip(updated);
+      await action();
+      await load();
     } catch (error: any) {
       Alert.alert(
-        'เริ่มเที่ยวไม่สำเร็จ',
+        failTitle,
         error?.response?.data?.message ?? 'กรุณาลองใหม่อีกครั้ง',
       );
     } finally {
@@ -82,27 +99,56 @@ export default function DriverHome() {
     }
   };
 
-  const handleComplete = () => {
+  const handleStart = () => {
     if (!trip) return;
 
-    Alert.alert('จบงาน', 'ยืนยันว่าส่งน้ำแข็งครบแล้วและกลับโรงงาน?', [
+    runAction(async () => {
+      await tripsApi.start(trip.id);
+      await shiftsApi.start({ tripId: trip.id });
+    }, 'เริ่มเที่ยวไม่สำเร็จ');
+  };
+
+  const handleStartMyShift = () => {
+    if (!trip) return;
+
+    runAction(
+      () => shiftsApi.start({ tripId: trip.id }),
+      'เข้าเวรไม่สำเร็จ',
+    );
+  };
+
+  const handleBreak = () => {
+    if (!myShift) return;
+    runAction(() => shiftsApi.takeBreak(myShift.id), 'พักเบรกไม่สำเร็จ');
+  };
+
+  const handleResume = () => {
+    if (!myShift) return;
+    runAction(() => shiftsApi.resume(myShift.id), 'กลับเข้างานไม่สำเร็จ');
+  };
+
+  const handleEndMyShift = () => {
+    if (!myShift) return;
+
+    Alert.alert('จบกะของฉัน', 'ยืนยันจบกะการทำงานของคุณ?', [
       { text: 'ยกเลิก', style: 'cancel' },
       {
         text: 'ยืนยัน',
-        onPress: async () => {
-          try {
-            setBusy(true);
-            await tripsApi.complete(trip.id);
-            await load();
-          } catch (error: any) {
-            Alert.alert(
-              'จบงานไม่สำเร็จ',
-              error?.response?.data?.message ?? 'กรุณาลองใหม่อีกครั้ง',
-            );
-          } finally {
-            setBusy(false);
-          }
-        },
+        onPress: () =>
+          runAction(() => shiftsApi.end(myShift.id), 'จบกะไม่สำเร็จ'),
+      },
+    ]);
+  };
+
+  const handleComplete = () => {
+    if (!trip) return;
+
+    Alert.alert('ปิดเที่ยว', 'ยืนยันว่าส่งน้ำแข็งครบแล้วและนำรถกลับโรงงาน?', [
+      { text: 'ยกเลิก', style: 'cancel' },
+      {
+        text: 'ยืนยัน',
+        onPress: () =>
+          runAction(() => tripsApi.complete(trip.id), 'ปิดเที่ยวไม่สำเร็จ'),
       },
     ]);
   };
@@ -114,6 +160,8 @@ export default function DriverHome() {
       </View>
     );
   }
+
+  const isMainDriver = trip?.driverId === user?.id;
 
   return (
     <ScrollView
@@ -145,8 +193,20 @@ export default function DriverHome() {
               {trip.vehicle.name} ({trip.vehicle.plate})
             </Text>
             <Text style={styles.status}>
-              สถานะ: {TRIP_STATUS_LABEL[trip.status]}
+              สถานะเที่ยว: {TRIP_STATUS_LABEL[trip.status]}
             </Text>
+            {myShift && (
+              <View
+                style={[
+                  styles.shiftPill,
+                  myShift.status === 'ON_BREAK' && styles.shiftPillBreak,
+                ]}
+              >
+                <Text style={styles.shiftPillText}>
+                  กะของฉัน: {SHIFT_STATUS_LABEL[myShift.status]}
+                </Text>
+              </View>
+            )}
             <Text style={styles.total}>
               ยอดขายเที่ยวนี้: {formatCurrency(trip.totalAmount)}
             </Text>
@@ -166,7 +226,7 @@ export default function DriverHome() {
             ))}
           </View>
 
-          {trip.status === 'LOADING' && (
+          {trip.status === 'LOADING' && isMainDriver && (
             <TouchableOpacity
               style={styles.primaryButton}
               disabled={busy}
@@ -178,49 +238,120 @@ export default function DriverHome() {
             </TouchableOpacity>
           )}
 
-          {trip.status === 'IN_PROGRESS' && (
+          {trip.status === 'LOADING' && !isMainDriver && (
+            <View style={styles.card}>
+              <Text style={styles.emptySub}>
+                รอคนขับหลักเริ่มเที่ยวก่อนจึงจะเข้าเวรได้
+              </Text>
+            </View>
+          )}
+
+          {trip.status === 'IN_PROGRESS' && !myShift && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              disabled={busy}
+              onPress={handleStartMyShift}
+            >
+              <Text style={styles.primaryButtonText}>
+                {busy ? 'กำลังเข้าเวร...' : 'เข้าเวร (เริ่มกะของฉัน)'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {trip.status === 'IN_PROGRESS' && myShift?.status === 'ACTIVE' && (
             <>
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => router.push(`/new-delivery/${trip.id}`)}
+                onPress={() => router.push(`/todo-list/${trip.id}`)}
               >
                 <Text style={styles.primaryButtonText}>
-                  บันทึกการส่งของ
+                  รายการที่ต้องส่งวันนี้
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.rowGap}>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.flex1]}
+                  disabled={busy}
+                  onPress={handleBreak}
+                >
+                  <Text style={styles.secondaryButtonText}>พักเบรก</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.flex1]}
+                  onPress={() => router.push(`/report-problem/${trip.id}`)}
+                >
+                  <Text style={styles.secondaryButtonText}>แจ้งปัญหา</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.textButton}
+                disabled={busy}
+                onPress={handleEndMyShift}
+              >
+                <Text style={styles.textButtonLabel}>จบกะของฉัน</Text>
+              </TouchableOpacity>
+
+              {isMainDriver && (
+                <TouchableOpacity
+                  style={styles.dangerButton}
+                  disabled={busy}
+                  onPress={handleComplete}
+                >
+                  <Text style={styles.dangerButtonText}>
+                    {busy ? 'กำลังปิดเที่ยว...' : 'ปิดเที่ยว / รถกลับโรงงาน'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+
+          {trip.status === 'IN_PROGRESS' && myShift?.status === 'ON_BREAK' && (
+            <>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                disabled={busy}
+                onPress={handleResume}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {busy ? 'กำลังกลับเข้างาน...' : 'กลับเข้างาน'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.secondaryButton}
+                style={styles.textButton}
                 disabled={busy}
-                onPress={handleComplete}
+                onPress={handleEndMyShift}
               >
-                <Text style={styles.secondaryButtonText}>
-                  {busy ? 'กำลังจบงาน...' : 'จบงาน / กลับโรงงาน'}
-                </Text>
+                <Text style={styles.textButtonLabel}>จบกะของฉัน</Text>
               </TouchableOpacity>
-
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>
-                  ประวัติการส่งเที่ยวนี้ ({deliveries.length})
-                </Text>
-
-                {deliveries.length === 0 && (
-                  <Text style={styles.emptySub}>ยังไม่มีการส่งของ</Text>
-                )}
-
-                {deliveries.map((delivery) => (
-                  <View key={delivery.id} style={styles.deliveryRow}>
-                    <Text style={styles.itemName}>
-                      {delivery.customerName ?? 'ลูกค้า'}{' '}
-                      {delivery.village ? `(${delivery.village})` : ''}
-                    </Text>
-                    <Text style={styles.itemQty}>
-                      {formatCurrency(delivery.totalAmount)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
             </>
+          )}
+
+          {trip.status === 'IN_PROGRESS' && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>
+                ประวัติการส่งเที่ยวนี้ ({deliveries.length})
+              </Text>
+
+              {deliveries.length === 0 && (
+                <Text style={styles.emptySub}>ยังไม่มีการส่งของ</Text>
+              )}
+
+              {deliveries.map((delivery) => (
+                <View key={delivery.id} style={styles.deliveryRow}>
+                  <Text style={styles.itemName}>
+                    {delivery.customerName ?? 'ลูกค้า'}{' '}
+                    {delivery.village ? `(${delivery.village})` : ''}
+                  </Text>
+                  <Text style={styles.itemQty}>
+                    {formatCurrency(delivery.totalAmount)}
+                  </Text>
+                </View>
+              ))}
+            </View>
           )}
         </>
       )}
@@ -274,6 +405,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+  shiftPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dcf5e3',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  shiftPillBreak: {
+    backgroundColor: '#fdecc8',
+  },
+  shiftPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a7f37',
+  },
   total: {
     fontSize: 16,
     fontWeight: '600',
@@ -305,6 +451,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#ddd',
   },
+  rowGap: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  flex1: {
+    flex: 1,
+  },
   primaryButton: {
     backgroundColor: '#222',
     paddingVertical: 14,
@@ -318,14 +471,35 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: '#c0392b',
+    borderColor: '#222',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
   },
   secondaryButtonText: {
+    color: '#222',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  dangerButton: {
+    borderWidth: 1,
+    borderColor: '#c0392b',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  dangerButtonText: {
     color: '#c0392b',
     fontWeight: '600',
     fontSize: 16,
+  },
+  textButton: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  textButtonLabel: {
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

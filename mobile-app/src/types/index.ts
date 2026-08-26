@@ -2,6 +2,10 @@ export type UserRole = 'ADMIN' | 'STAFF' | 'DRIVER';
 export type VehicleStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
 export type TripStatus = 'LOADING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type PaymentStatus = 'PENDING' | 'PAID';
+export type TripCrewRole = 'DRIVER' | 'HELPER';
+export type ShiftStatus = 'ACTIVE' | 'ON_BREAK' | 'ENDED';
+export type ProblemCategory = 'VEHICLE' | 'CUSTOMER' | 'STOCK' | 'OTHER';
+export type ProblemStatus = 'OPEN' | 'RESOLVED';
 
 export interface AuthUser {
   id: number;
@@ -49,6 +53,7 @@ export interface DeliveryItem {
 export interface Delivery {
   id: number;
   tripId: number;
+  customerId: number | null;
   customerName: string | null;
   village: string | null;
   latitude: number | null;
@@ -66,6 +71,13 @@ export interface TripDriver {
   role: UserRole;
 }
 
+export interface TripCrewMember {
+  tripId: number;
+  userId: number;
+  roleOnTrip: TripCrewRole;
+  user: TripDriver;
+}
+
 export interface Trip {
   id: number;
   vehicleId: number;
@@ -77,8 +89,56 @@ export interface Trip {
   createdAt: string;
   vehicle: Vehicle;
   driver: TripDriver;
+  crew: TripCrewMember[];
   items: TripItem[];
   deliveries?: Delivery[];
+}
+
+export interface Zone {
+  id: number;
+  name: string;
+}
+
+export interface Village {
+  id: number;
+  zoneId: number;
+  name: string;
+  zone: Zone;
+}
+
+export interface Customer {
+  id: number;
+  villageId: number;
+  name: string;
+  phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  note: string | null;
+  village: Village;
+}
+
+export interface Shift {
+  id: number;
+  tripId: number;
+  userId: number;
+  status: ShiftStatus;
+  startedAt: string;
+  endedAt: string | null;
+  user: TripDriver;
+  trip: { id: number; vehicleId: number; driverId: number; vehicle: Vehicle };
+}
+
+export interface ProblemReport {
+  id: number;
+  tripId: number;
+  userId: number;
+  category: ProblemCategory;
+  description: string;
+  status: ProblemStatus;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: string;
+  user: TripDriver;
 }
 
 export interface GpsLog {

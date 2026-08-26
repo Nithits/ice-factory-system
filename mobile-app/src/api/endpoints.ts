@@ -1,12 +1,18 @@
 import { api } from './api';
 import type {
   AuthUser,
+  Customer,
   Delivery,
   IceProduct,
+  ProblemCategory,
+  ProblemReport,
+  Shift,
   Trip,
   UserRole,
   Vehicle,
   VehicleWithLocation,
+  Village,
+  Zone,
 } from '../types';
 
 export interface LoginResult {
@@ -52,6 +58,7 @@ export interface CreateTripItemPayload {
 export interface CreateTripPayload {
   vehicleId: number;
   driverId: number;
+  helperIds?: number[];
   items: CreateTripItemPayload[];
 }
 
@@ -74,6 +81,7 @@ export interface CreateDeliveryItemPayload {
 
 export interface CreateDeliveryPayload {
   tripId: number;
+  customerId?: number;
   customerName: string;
   village?: string;
   latitude?: number;
@@ -105,5 +113,66 @@ export const trackingApi = {
   latestVehicles: () =>
     api
       .get<VehicleWithLocation[]>('/tracking/vehicles')
+      .then((res) => res.data),
+};
+
+export const zonesApi = {
+  list: () => api.get<Zone[]>('/zones').then((res) => res.data),
+};
+
+export const villagesApi = {
+  list: (zoneId?: number) =>
+    api
+      .get<Village[]>('/villages', { params: { zoneId } })
+      .then((res) => res.data),
+};
+
+export interface CreateCustomerPayload {
+  villageId: number;
+  name: string;
+  phone?: string;
+  latitude?: number;
+  longitude?: number;
+  note?: string;
+}
+
+export const customersApi = {
+  list: (villageId?: number) =>
+    api
+      .get<Customer[]>('/customers', { params: { villageId } })
+      .then((res) => res.data),
+  create: (payload: CreateCustomerPayload) =>
+    api.post<Customer>('/customers', payload).then((res) => res.data),
+};
+
+export interface StartShiftPayload {
+  tripId: number;
+}
+
+export const shiftsApi = {
+  start: (payload: StartShiftPayload) =>
+    api.post<Shift>('/shifts', payload).then((res) => res.data),
+  listByTrip: (tripId: number) =>
+    api.get<Shift[]>('/shifts', { params: { tripId } }).then((res) => res.data),
+  takeBreak: (id: number) =>
+    api.patch<Shift>(`/shifts/${id}/break`).then((res) => res.data),
+  resume: (id: number) =>
+    api.patch<Shift>(`/shifts/${id}/resume`).then((res) => res.data),
+  end: (id: number) =>
+    api.patch<Shift>(`/shifts/${id}/end`).then((res) => res.data),
+};
+
+export interface CreateProblemReportPayload {
+  tripId: number;
+  category?: ProblemCategory;
+  description: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export const problemReportsApi = {
+  create: (payload: CreateProblemReportPayload) =>
+    api
+      .post<ProblemReport>('/problem-reports', payload)
       .then((res) => res.data),
 };
