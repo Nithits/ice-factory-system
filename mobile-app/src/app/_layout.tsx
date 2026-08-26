@@ -40,9 +40,8 @@ function RootNavigator() {
       />
 
       <Stack.Screen
-        name="home"
+        name="(tabs)"
         options={{
-          title: 'หน้าหลัก',
           headerShown: false,
         }}
       />
@@ -51,13 +50,6 @@ function RootNavigator() {
         name="new-trip"
         options={{
           title: 'เช็คยอดก่อนออกรถ',
-        }}
-      />
-
-      <Stack.Screen
-        name="trips"
-        options={{
-          title: 'เที่ยวรถทั้งหมด',
         }}
       />
 
@@ -72,13 +64,6 @@ function RootNavigator() {
         name="new-delivery/[tripId]"
         options={{
           title: 'บันทึกการส่งของ',
-        }}
-      />
-
-      <Stack.Screen
-        name="todo-list/[tripId]"
-        options={{
-          title: 'รายการที่ต้องส่งวันนี้',
         }}
       />
 

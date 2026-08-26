@@ -24,7 +24,7 @@ const SHIFT_STATUS_LABEL: Record<Shift['status'], string> = {
 };
 
 export default function DriverHome() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [trip, setTrip] = useState<Trip | null | undefined>(undefined);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [myShift, setMyShift] = useState<Shift | null>(null);
@@ -172,9 +172,6 @@ export default function DriverHome() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>สวัสดี {user?.name}</Text>
-        <TouchableOpacity onPress={logout}>
-          <Text style={styles.logout}>ออกจากระบบ</Text>
-        </TouchableOpacity>
       </View>
 
       {!trip && (
@@ -260,15 +257,6 @@ export default function DriverHome() {
 
           {trip.status === 'IN_PROGRESS' && myShift?.status === 'ACTIVE' && (
             <>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => router.push(`/todo-list/${trip.id}`)}
-              >
-                <Text style={styles.primaryButtonText}>
-                  รายการที่ต้องส่งวันนี้
-                </Text>
-              </TouchableOpacity>
-
               <View style={styles.rowGap}>
                 <TouchableOpacity
                   style={[styles.secondaryButton, styles.flex1]}
@@ -377,10 +365,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-  },
-  logout: {
-    color: '#c0392b',
-    fontWeight: '600',
   },
   card: {
     backgroundColor: '#f5f5f5',

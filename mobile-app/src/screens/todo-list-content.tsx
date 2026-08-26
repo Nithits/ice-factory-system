@@ -9,10 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
-import { customersApi, deliveriesApi } from '../../api/endpoints';
-import type { Customer } from '../../types';
+import { customersApi, deliveriesApi } from '../api/endpoints';
+import type { Customer } from '../types';
 
 interface VillageGroup {
   villageId: number;
@@ -21,8 +21,7 @@ interface VillageGroup {
   customers: Customer[];
 }
 
-export default function TodoListScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+export default function TodoListContent({ tripId }: { tripId: number }) {
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [doneCustomerIds, setDoneCustomerIds] = useState<Set<number>>(
     new Set(),
@@ -39,7 +38,7 @@ export default function TodoListScreen() {
 
     const done = new Set<number>();
     for (const delivery of deliveries) {
-      if (delivery.tripId === Number(tripId) && delivery.customerId) {
+      if (delivery.tripId === tripId && delivery.customerId) {
         done.add(delivery.customerId);
       }
     }

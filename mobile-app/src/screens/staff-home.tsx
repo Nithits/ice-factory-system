@@ -15,7 +15,7 @@ import type { Trip } from '../types';
 import { TRIP_STATUS_LABEL, formatCurrency } from '../utils/format';
 
 export default function StaffHome() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -40,9 +40,6 @@ export default function StaffHome() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>สวัสดี {user?.name}</Text>
-        <TouchableOpacity onPress={logout}>
-          <Text style={styles.logout}>ออกจากระบบ</Text>
-        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -52,13 +49,6 @@ export default function StaffHome() {
         <Text style={styles.primaryButtonText}>
           เช็คยอด & สร้างเที่ยวใหม่
         </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => router.push('/trips')}
-      >
-        <Text style={styles.secondaryButtonText}>ดูเที่ยวรถทั้งหมด</Text>
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>เที่ยวล่าสุด</Text>
@@ -110,10 +100,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
   },
-  logout: {
-    color: '#c0392b',
-    fontWeight: '600',
-  },
   primaryButton: {
     backgroundColor: '#222',
     paddingVertical: 14,
@@ -122,18 +108,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#222',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#222',
     fontWeight: '600',
     fontSize: 16,
   },

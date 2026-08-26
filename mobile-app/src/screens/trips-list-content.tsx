@@ -13,7 +13,7 @@ import { tripsApi } from '../api/endpoints';
 import type { Trip } from '../types';
 import { TRIP_STATUS_LABEL, formatCurrency } from '../utils/format';
 
-export default function TripsScreen() {
+export default function TripsListContent() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
