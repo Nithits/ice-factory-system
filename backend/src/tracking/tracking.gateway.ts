@@ -52,4 +52,8 @@ export class TrackingGateway
   emitTankUpdated(data: unknown) {
     this.server.emit('tank-updated', data);
   }
+
+  emitTripStopUpdated(data: unknown) {
+    this.server.emit('trip-stop-updated', data);
+  }
 }

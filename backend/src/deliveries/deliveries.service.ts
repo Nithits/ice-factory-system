@@ -131,10 +131,31 @@ export class DeliveriesService {
         },
       });
 
+      if (dto.customerId) {
+        await tx.tripStop.updateMany({
+          where: {
+            tripId: dto.tripId,
+            customerId: dto.customerId,
+            status: 'PENDING',
+          },
+          data: {
+            status: 'DONE',
+          },
+        });
+      }
+
       return delivery;
     });
 
     this.trackingGateway.emitDeliveryCreated(delivery);
+
+    if (dto.customerId) {
+      this.trackingGateway.emitTripStopUpdated({
+        tripId: dto.tripId,
+        customerId: dto.customerId,
+        status: 'DONE',
+      });
+    }
 
     return delivery;
   }

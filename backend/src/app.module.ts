@@ -18,6 +18,7 @@ import { CustomersModule } from './customers/customers.module';
 import { IceTanksModule } from './ice-tanks/ice-tanks.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { ProblemReportsModule } from './problem-reports/problem-reports.module';
+import { TripStopsModule } from './trip-stops/trip-stops.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ProblemReportsModule } from './problem-reports/problem-reports.module';
     IceTanksModule,
     ShiftsModule,
     ProblemReportsModule,
+    TripStopsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

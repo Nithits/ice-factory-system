@@ -60,6 +60,11 @@ enum TankStatus {
   NEEDS_REPLACEMENT
 }
 
+enum TripStopStatus {
+  PENDING
+  DONE
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   name      String
@@ -70,10 +75,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  trips          Trip[]          @relation("DriverTrips")
-  crewOf         TripCrew[]
-  shifts         Shift[]
-  problemReports ProblemReport[]
+  trips            Trip[]          @relation("DriverTrips")
+  crewOf           TripCrew[]
+  shifts           Shift[]
+  problemReports   ProblemReport[]
+  createdTripStops TripStop[]      @relation("CreatedTripStops")
 }
 
 model Vehicle {
@@ -120,6 +126,7 @@ model Trip {
   crew           TripCrew[]
   shifts         Shift[]
   problemReports ProblemReport[]
+  stops          TripStop[]
 }
 
 model Delivery {
@@ -225,6 +232,7 @@ model Customer {
   village    Village    @relation(fields: [villageId], references: [id], onDelete: Cascade)
   iceTanks   IceTank[]
   deliveries Delivery[]
+  tripStops  TripStop[]
 
   @@index([villageId])
   @@map("customers")
@@ -290,4 +298,24 @@ model ProblemReport {
 
   @@index([tripId])
   @@map("problem_reports")
+}
+
+model TripStop {
+  id          Int             @id @default(autoincrement())
+  tripId      Int
+  customerId  Int
+  note        String?
+  status      TripStopStatus  @default(PENDING)
+  createdById Int
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  customer  Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("CreatedTripStops", fields: [createdById], references: [id])
+
+  @@unique([tripId, customerId])
+  @@index([tripId])
+  @@index([customerId])
+  @@map("trip_stops")
 }
