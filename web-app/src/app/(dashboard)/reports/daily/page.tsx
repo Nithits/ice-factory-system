@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { deliveriesApi, tripsApi } from '@/lib/api';
-import { formatCurrency, isSameDay } from '@/lib/format';
-import type { Delivery, Trip } from '@/types';
+import { deliveriesApi, tripsApi, vehiclesApi } from '@/lib/api';
+import { formatCurrency } from '@/lib/format';
+import type { Delivery, Trip, Vehicle } from '@/types';
 
 function toDateInputValue(date: Date) {
   const offset = date.getTimezoneOffset();
@@ -12,25 +12,58 @@ function toDateInputValue(date: Date) {
   return local.toISOString().slice(0, 10);
 }
 
-export default function DailyReportPage() {
+function isWithinRange(isoDate: string, from: Date, to: Date) {
+  const date = new Date(isoDate);
+  return date >= from && date <= to;
+}
+
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          const value = String(cell);
+          return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+        })
+        .join(','),
+    )
+    .join('\r\n');
+
+  // ใส่ BOM ให้ Excel เปิดภาษาไทยได้ถูกต้อง
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function ReportPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [dateValue, setDateValue] = useState(() =>
-    toDateInputValue(new Date()),
-  );
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [fromDate, setFromDate] = useState(() => toDateInputValue(new Date()));
+  const [toDate, setToDate] = useState(() => toDateInputValue(new Date()));
+  const [vehicleId, setVehicleId] = useState<string>('all');
 
   useEffect(() => {
-    Promise.all([tripsApi.list(), deliveriesApi.list()]).then(
-      ([tripData, deliveryData]) => {
+    Promise.all([tripsApi.list(), deliveriesApi.list(), vehiclesApi.list()]).then(
+      ([tripData, deliveryData, vehicleData]) => {
         setTrips(tripData);
         setDeliveries(deliveryData);
+        setVehicles(vehicleData);
       },
     );
   }, []);
 
-  const selectedDay = useMemo(() => new Date(`${dateValue}T00:00:00`), [
-    dateValue,
-  ]);
+  const range = useMemo(
+    () => ({
+      from: new Date(`${fromDate}T00:00:00`),
+      to: new Date(`${toDate}T23:59:59.999`),
+    }),
+    [fromDate, toDate],
+  );
 
   const tripsById = useMemo(() => {
     const map = new Map<number, Trip>();
@@ -38,10 +71,16 @@ export default function DailyReportPage() {
     return map;
   }, [trips]);
 
-  const dayDeliveries = useMemo(
-    () => deliveries.filter((d) => isSameDay(d.deliveredAt, selectedDay)),
-    [deliveries, selectedDay],
-  );
+  const filteredDeliveries = useMemo(() => {
+    return deliveries.filter((delivery) => {
+      if (!isWithinRange(delivery.deliveredAt, range.from, range.to)) {
+        return false;
+      }
+      if (vehicleId === 'all') return true;
+      const trip = tripsById.get(delivery.tripId);
+      return trip?.vehicleId === Number(vehicleId);
+    });
+  }, [deliveries, range, vehicleId, tripsById]);
 
   const rows = useMemo(() => {
     const grouped = new Map<
@@ -55,7 +94,7 @@ export default function DailyReportPage() {
       }
     >();
 
-    for (const delivery of dayDeliveries) {
+    for (const delivery of filteredDeliveries) {
       const trip = tripsById.get(delivery.tripId);
       if (!trip) continue;
 
@@ -79,7 +118,7 @@ export default function DailyReportPage() {
     }
 
     return Array.from(grouped.values()).sort((a, b) => b.revenue - a.revenue);
-  }, [dayDeliveries, tripsById]);
+  }, [filteredDeliveries, tripsById]);
 
   const totals = useMemo(
     () =>
@@ -94,17 +133,59 @@ export default function DailyReportPage() {
     [rows],
   );
 
+  const handleExport = () => {
+    downloadCsv(`รายงาน-${fromDate}-ถึง-${toDate}.csv`, [
+      ['รถ', 'คนขับ', 'จำนวนจุดส่ง', 'น้ำแข็ง (กระสอบ)', 'ยอดขาย (บาท)'],
+      ...rows.map((row) => [
+        row.vehicleName,
+        row.driverName,
+        row.deliveryCount,
+        row.sacks,
+        row.revenue.toFixed(2),
+      ]),
+      ['รวม', '', totals.deliveryCount, totals.sacks, totals.revenue.toFixed(2)],
+    ]);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">สรุปผลประจำวัน</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">รายงานผลการดำเนินงาน</h1>
 
-        <input
-          type="date"
-          value={dateValue}
-          onChange={(e) => setDateValue(e.target.value)}
-          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <span className="text-sm text-neutral-400">ถึง</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <select
+            value={vehicleId}
+            onChange={(e) => setVehicleId(e.target.value)}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+          >
+            <option value="all">ทุกคัน</option>
+            {vehicles.map((vehicle) => (
+              <option key={vehicle.id} value={vehicle.id}>
+                {vehicle.name} ({vehicle.plate})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleExport}
+            disabled={rows.length === 0}
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-40"
+          >
+            ⬇ Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -154,7 +235,7 @@ export default function DailyReportPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-neutral-400">
-                  ไม่มีข้อมูลการส่งของในวันที่เลือก
+                  ไม่มีข้อมูลการส่งของในช่วงที่เลือก
                 </td>
               </tr>
             )}

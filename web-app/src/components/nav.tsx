@@ -12,7 +12,8 @@ const LINKS = [
   { href: '/customers', label: 'ร้านค้า' },
   { href: '/warehouse', label: 'คลังสินค้า' },
   { href: '/employees', label: 'พนักงาน' },
-  { href: '/reports/daily', label: 'สรุปรายวัน' },
+  { href: '/reports/daily', label: 'รายงาน' },
+  { href: '/settings', label: 'ตั้งค่า' },
 ];
 
 export function Nav() {

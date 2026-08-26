@@ -12,6 +12,7 @@ import type {
   Trip,
   UserRole,
   Vehicle,
+  VehicleStatus,
   VehicleWithLocation,
   Village,
   Zone,
@@ -105,13 +106,40 @@ export const deliveriesApi = {
   list: () => api.get<Delivery[]>('/deliveries').then((res) => res.data),
 };
 
+export interface CreateVehiclePayload {
+  name: string;
+  plate: string;
+  status?: VehicleStatus;
+}
+
 export const vehiclesApi = {
   list: () => api.get<Vehicle[]>('/vehicles').then((res) => res.data),
+  create: (payload: CreateVehiclePayload) =>
+    api.post<Vehicle>('/vehicles', payload).then((res) => res.data),
+  update: (id: number, payload: Partial<CreateVehiclePayload>) =>
+    api.patch<Vehicle>(`/vehicles/${id}`, payload).then((res) => res.data),
+  remove: (id: number) =>
+    api.delete(`/vehicles/${id}`).then((res) => res.data),
 };
+
+export interface CreateIceProductPayload {
+  name: string;
+  unit?: string;
+  price: number;
+  isActive?: boolean;
+}
 
 export const iceProductsApi = {
   list: () =>
     api.get<IceProduct[]>('/ice-products').then((res) => res.data),
+  create: (payload: CreateIceProductPayload) =>
+    api.post<IceProduct>('/ice-products', payload).then((res) => res.data),
+  update: (id: number, payload: Partial<CreateIceProductPayload>) =>
+    api
+      .patch<IceProduct>(`/ice-products/${id}`, payload)
+      .then((res) => res.data),
+  remove: (id: number) =>
+    api.delete(`/ice-products/${id}`).then((res) => res.data),
 };
 
 export const trackingApi = {
