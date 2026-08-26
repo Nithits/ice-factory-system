@@ -1,6 +1,34 @@
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { Stack, usePathname, useRouter } from 'expo-router';
 
-export default function RootLayout() {
+import { AuthProvider, useAuth } from '../context/auth-context';
+
+function RootNavigator() {
+  const { user, loading } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    if (!user && pathname !== '/') {
+      router.replace('/');
+    } else if (user && pathname === '/') {
+      router.replace('/home');
+    }
+  }, [user, loading, pathname, router]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <Stack>
       <Stack.Screen
@@ -12,18 +40,54 @@ export default function RootLayout() {
       />
 
       <Stack.Screen
-        name="home"
+        name="(tabs)"
         options={{
-          title: 'หน้าหลัก',
+          headerShown: false,
         }}
       />
 
       <Stack.Screen
-        name="trip"
+        name="new-trip"
         options={{
-          title: 'เที่ยวส่งน้ำแข็ง',
+          title: 'เช็คยอดก่อนออกรถ',
+        }}
+      />
+
+      <Stack.Screen
+        name="trip/[id]"
+        options={{
+          title: 'รายละเอียดเที่ยว',
+        }}
+      />
+
+      <Stack.Screen
+        name="new-delivery/[tripId]"
+        options={{
+          title: 'บันทึกการส่งของ',
+        }}
+      />
+
+      <Stack.Screen
+        name="new-customer"
+        options={{
+          title: 'เพิ่มร้านค้าใหม่',
+        }}
+      />
+
+      <Stack.Screen
+        name="report-problem/[tripId]"
+        options={{
+          title: 'แจ้งปัญหา',
         }}
       />
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
   );
 }

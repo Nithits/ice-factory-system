@@ -30,6 +30,11 @@ export class CreateDeliveryDto {
   @IsPositive()
   tripId!: number;
 
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  customerId?: number;
+
   @IsString()
   @IsNotEmpty()
   customerName!: string;

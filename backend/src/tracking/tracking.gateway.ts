@@ -28,4 +28,32 @@ export class TrackingGateway
   emitVehicleLocation(data: unknown) {
     this.server.emit('vehicle-location', data);
   }
+
+  emitTripUpdated(data: unknown) {
+    this.server.emit('trip-updated', data);
+  }
+
+  emitDeliveryCreated(data: unknown) {
+    this.server.emit('delivery-created', data);
+  }
+
+  emitShiftUpdated(data: unknown) {
+    this.server.emit('shift-updated', data);
+  }
+
+  emitProblemReported(data: unknown) {
+    this.server.emit('problem-reported', data);
+  }
+
+  emitCustomerAdded(data: unknown) {
+    this.server.emit('customer-added', data);
+  }
+
+  emitTankUpdated(data: unknown) {
+    this.server.emit('tank-updated', data);
+  }
+
+  emitTripStopUpdated(data: unknown) {
+    this.server.emit('trip-stop-updated', data);
+  }
 }

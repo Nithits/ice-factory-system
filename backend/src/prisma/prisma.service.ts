@@ -15,6 +15,10 @@ export class PrismaService
       password: process.env.DATABASE_PASSWORD || 'ice_password',
       database: process.env.DATABASE_NAME || 'ice_factory',
       connectionLimit: 5,
+      // MySQL 8+ ใช้ caching_sha2_password เป็นค่าเริ่มต้น ซึ่งต้องขอ RSA
+      // public key จาก server ตอนไม่ได้เชื่อมด้วย SSL — ถ้าไม่เปิดตัวนี้
+      // การเชื่อมต่อจะล้มเหลวเป็นระยะๆ ด้วย "RSA public key is not available"
+      allowPublicKeyRetrieval: true,
     });
 
     super({ adapter });

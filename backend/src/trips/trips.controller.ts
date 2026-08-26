@@ -12,6 +12,8 @@ import {
 import { TripsService } from './trips.service';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/current-user.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('trips')
@@ -33,12 +35,14 @@ export class TripsController {
     return this.tripsService.findOne(id);
   }
   @Patch(':id/start')
-    startTrip(@Param('id', ParseIntPipe) id: number) {
+  startTrip(@Param('id', ParseIntPipe) id: number) {
     return this.tripsService.startTrip(id);
-    }
+  }
   @Patch(':id/complete')
-    completeTrip(@Param('id', ParseIntPipe) id: number) {
-    return this.tripsService.completeTrip(id);
-    }
-
+  completeTrip(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tripsService.completeTrip(id, user.sub);
+  }
 }

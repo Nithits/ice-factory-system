@@ -6,10 +6,14 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDeliveryDto } from './dto/create-delivery.dto';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class DeliveriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly trackingGateway: TrackingGateway,
+  ) {}
 
   async create(dto: CreateDeliveryDto) {
     const trip = await this.prisma.trip.findUnique({
@@ -29,6 +33,16 @@ export class DeliveriesService {
       throw new BadRequestException(
         'Trip นี้ยังไม่ได้เริ่มออกส่ง หรือจบงานแล้ว',
       );
+    }
+
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: dto.customerId },
+      });
+
+      if (!customer) {
+        throw new NotFoundException(`ไม่พบร้านค้า ID ${dto.customerId}`);
+      }
     }
 
     let deliveryTotal = 0;
@@ -53,10 +67,11 @@ export class DeliveriesService {
       deliveryTotal += item.quantity * item.unitPrice;
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const delivery = await this.prisma.$transaction(async (tx) => {
       const delivery = await tx.delivery.create({
         data: {
           tripId: dto.tripId,
+          customerId: dto.customerId,
           customerName: dto.customerName,
           village: dto.village,
           latitude: dto.latitude,
@@ -116,8 +131,33 @@ export class DeliveriesService {
         },
       });
 
+      if (dto.customerId) {
+        await tx.tripStop.updateMany({
+          where: {
+            tripId: dto.tripId,
+            customerId: dto.customerId,
+            status: 'PENDING',
+          },
+          data: {
+            status: 'DONE',
+          },
+        });
+      }
+
       return delivery;
     });
+
+    this.trackingGateway.emitDeliveryCreated(delivery);
+
+    if (dto.customerId) {
+      this.trackingGateway.emitTripStopUpdated({
+        tripId: dto.tripId,
+        customerId: dto.customerId,
+        status: 'DONE',
+      });
+    }
+
+    return delivery;
   }
 
   findAll() {
@@ -135,6 +175,8 @@ export class DeliveriesService {
             },
           },
         },
+
+        customer: true,
 
         items: {
           include: {
@@ -168,6 +210,8 @@ export class DeliveriesService {
             },
           },
         },
+
+        customer: true,
 
         items: {
           include: {
